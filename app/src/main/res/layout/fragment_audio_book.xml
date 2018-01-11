@@ -31,7 +31,8 @@
         android:background="@android:color/transparent"
         android:paddingStart="@dimen/margin_medium"
         android:paddingEnd="@dimen/margin_medium"
-        android:paddingTop="16dp"/>
+        android:paddingTop="16dp"
+        android:visibility="invisible"/>
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"

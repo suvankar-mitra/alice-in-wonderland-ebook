@@ -2,6 +2,7 @@ package com.suvankarmitra.fullscreentextdemo3;
 
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.PorterDuff;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
@@ -28,6 +29,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static android.media.AudioManager.AUDIOFOCUS_GAIN;
+import static android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT;
+import static android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK;
+
 
 /**
  * A simple {@link Fragment} subclass.
@@ -51,7 +56,9 @@ public class AudioBookFragment extends Fragment {
     TextView curTime, totTime;
     RelativeLayout progressBar;
     boolean isPlaying = false;
+    boolean hasAudioFocus = true;
     private boolean initialStage = true;
+    private boolean firstLoad = true;
     private Handler mHandler = new Handler();
 
     private boolean seekBarDragged = false;
@@ -115,6 +122,31 @@ public class AudioBookFragment extends Fragment {
         progressBar = (RelativeLayout) view.findViewById(R.id.player_progressbar);
         playButton = (ImageButton) view.findViewById(R.id.player_play_btn);
         mediaPlayer = new MediaPlayer();
+        AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        int result = am.requestAudioFocus(new AudioManager.OnAudioFocusChangeListener() {
+            @Override
+            public void onAudioFocusChange(int i) {
+                switch (i) {
+                    case AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK :
+                        mediaPlayer.setVolume(0.5f,0.5f);
+                        break;
+                    case AUDIOFOCUS_GAIN_TRANSIENT :
+                    case AUDIOFOCUS_GAIN:
+                        mediaPlayer.setVolume(1f,1f);
+                        break;
+                    case AudioManager.AUDIOFOCUS_LOSS :
+                        hasAudioFocus = false;
+                        pauseMedia();
+                        break;
+                }
+            }
+        },AudioManager.STREAM_MUSIC,AudioManager.AUDIOFOCUS_GAIN);
+        if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+            // Start playback.
+            hasAudioFocus = true;
+        } else {
+            hasAudioFocus = false;
+        }
         mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
         if(initialStage) {
             String [] urls = {"https://drive.google.com/uc?export=download&id=1buBea8t9tBi6FfBRPLlOcq8KNjmiDWU-",
@@ -138,7 +170,7 @@ public class AudioBookFragment extends Fragment {
                     "Alice's Adevntures in Wonderland\nChapter - IX"  ,
                     "Alice's Adevntures in Wonderland\nChapter - X"};
             urlProvider = new UrlProvider(urls,titles);
-            String url = urlProvider.getNextUrl();
+            String url = urlProvider.getUrlById(getCurrentTrackNumber());//urlProvider.getNextUrl();
             new Player().execute(url);
             title.setText(urlProvider.getTitle(url));
             //new Player().execute("https://ia802508.us.archive.org/5/items/testmp3testfile/mpthreetest.mp3");
@@ -146,19 +178,7 @@ public class AudioBookFragment extends Fragment {
         playButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if(!isPlaying) {
-                    if(mediaPlayer!=null && !mediaPlayer.isPlaying()) {
-                        mediaPlayer.start();
-                    }
-                    playButton.setImageResource(R.drawable.ic_pause_circle_filled_black_24dp);
-                    isPlaying = true;
-                } else {
-                    if(mediaPlayer!=null && mediaPlayer.isPlaying()) {
-                        mediaPlayer.pause();
-                    }
-                    playButton.setImageResource(R.drawable.ic_play_circle_filled_black_24dp);
-                    isPlaying = false;
-                }
+                playAndPauseMedia();
             }
         });
 
@@ -208,6 +228,34 @@ public class AudioBookFragment extends Fragment {
         return view;
     }
 
+    private void playAndPauseMedia() {
+        if(!isPlaying) {
+            playMedia();
+        } else {
+            pauseMedia();
+        }
+    }
+
+    private void playMedia() {
+        try {
+            if(mediaPlayer!=null && !mediaPlayer.isPlaying()) {
+                mediaPlayer.start();
+            }
+        } catch (IllegalStateException e){}
+        playButton.setImageResource(R.drawable.ic_pause_circle_filled_black_24dp);
+        isPlaying = true;
+    }
+
+    private void pauseMedia() {
+        try{
+            if(mediaPlayer!=null && mediaPlayer.isPlaying()) {
+                mediaPlayer.pause();
+            }
+        } catch (IllegalStateException e){}
+        playButton.setImageResource(R.drawable.ic_play_circle_filled_black_24dp);
+        isPlaying = false;
+    }
+
     String TAG = "audio";
     class Player extends AsyncTask<String, Void, Boolean> {
 
@@ -234,7 +282,7 @@ public class AudioBookFragment extends Fragment {
                             seekBar.setMax(mediaPlayer.getDuration());
                         } else {
                             seekBar.setVisibility(View.GONE);
-                            totTime.setText("Streaming radio");
+                            totTime.setText("Streaming audio");
                         }
                         ((MainActivity)context).runOnUiThread(new Runnable() {
                             @Override
@@ -253,6 +301,15 @@ public class AudioBookFragment extends Fragment {
                             }
                         });
                         progressBar.setVisibility(View.INVISIBLE);
+                        if(firstLoad) {
+                            try{
+                                Log.d(TAG, "onPrepared: getCurrentTrackPosition "+getCurrentTrackPosition());
+                                mediaPlayer.seekTo(getCurrentTrackPosition());
+                            } catch (Exception e){
+                                e.printStackTrace();
+                            }
+                            firstLoad = false;
+                        }
                         mediaPlayer.start();
                         isPlaying = true;
                         playButton.setImageResource(R.drawable.ic_pause_circle_filled_black_24dp);
@@ -322,6 +379,7 @@ public class AudioBookFragment extends Fragment {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        saveCurrentTrack();
         isPlaying = false;
         try {
             mediaPlayer.stop();
@@ -336,11 +394,35 @@ public class AudioBookFragment extends Fragment {
         }
     }
 
+    private void saveCurrentTrack() {
+        SharedPreferences sharedPref = ((MainActivity)context).getPreferences(Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.putInt("TRACK", urlProvider.getCurrentUrlId());
+        editor.putInt("CURRENT_POSITION", mediaPlayer.getCurrentPosition());
+        editor.apply();
+    }
+
+    private int getCurrentTrackNumber() {
+        SharedPreferences sharedPref = ((MainActivity)context).getPreferences(Context.MODE_PRIVATE);
+        int defaultValue = 0;
+        int index = sharedPref.getInt("TRACK", defaultValue);
+        return index;
+    }
+
+    private int getCurrentTrackPosition() {
+        SharedPreferences sharedPref = ((MainActivity)context).getPreferences(Context.MODE_PRIVATE);
+        int defaultValue = 0;
+        int index = sharedPref.getInt("CURRENT_POSITION", defaultValue);
+        return index;
+    }
+
     class UrlProvider{
         private List<String> urls = new ArrayList<>(10);
         private Map<String,String> titles = new HashMap<>(10);
-        int currentUrl = 0;
+        int currentUrlId = 0;
         int currentTitle = 0;
+        boolean goingForward = true;
+
         public UrlProvider(String[] urls, String[] titles) {
             int i = 0;
             for(String u:urls) {
@@ -348,24 +430,48 @@ public class AudioBookFragment extends Fragment {
                 this.titles.put(u,titles[i++]);
             }
         }
+
+        public int getCurrentUrlId() {
+            if(goingForward)
+                return currentUrlId-1;
+            else
+                return currentUrlId+1;
+        }
+
         public String getNextUrl() {
-            if(currentUrl < urls.size())
-                return urls.get(currentUrl++);
+            goingForward = true;
+            if(currentUrlId < urls.size())
+                return urls.get(currentUrlId++);
             else return "";
+        }
+        public String getUrlById(int i) {
+            if(i>=0 || i<urls.size()) {
+                currentUrlId = i+1;
+                return urls.get(i);
+            }
+            return "";
+        }
+        public String getTitleById(int i) {
+            if(i>=0 || i<urls.size()) {
+                String u = urls.get(i);
+                return titles.get(u);
+            }
+            return "";
         }
         public String getTitle(String url) {
             return titles.get(url);
         }
         public String getPrevUrl() {
-            if(currentUrl > 0)
-                return urls.get(--currentUrl);
+            goingForward = false;
+            if(currentUrlId > 0)
+                return urls.get(--currentUrlId);
             else return "";
         }
         public boolean hasNextUrl() {
-            return currentUrl <urls.size();
+            return currentUrlId <urls.size();
         }
         public boolean hasPrevUrl() {
-            return currentUrl > 0;
+            return currentUrlId > 0;
         }
     }
 }
