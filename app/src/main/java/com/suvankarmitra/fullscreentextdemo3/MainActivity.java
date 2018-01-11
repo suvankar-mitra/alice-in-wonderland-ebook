@@ -159,7 +159,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        progressBar = (ProgressBar) findViewById(R.id.progress);
+        progressBar = findViewById(R.id.progress);
         progressBar.setVisibility(View.VISIBLE);
         mRecyclerView = findViewById(R.id.recycler_view);
         viewAdapter = new ViewAdapter(MainActivity.this,stories);
@@ -356,7 +356,7 @@ public class MainActivity extends AppCompatActivity {
         progressBar.setVisibility(View.VISIBLE);
         stories.clear();
         viewAdapter.notifyDataSetChanged();
-        URL[] urls = new URL[6];
+        URL[] urls = new URL[13];
         try {
             //urls[0] = new URL("https://drive.google.com/uc?export=download&id=1f00xSIN4CETQn83vSMc2HLVx0DqgpoqM");
             urls[0] = new URL("https://drive.google.com/uc?export=download&id=1pXvWijW-H4J4nqNR_s9gitf4lc-7A4wK");
@@ -365,6 +365,13 @@ public class MainActivity extends AppCompatActivity {
             urls[3] = new URL("https://drive.google.com/uc?export=download&id=1iMfp_mQWYou64h4zeI8A4Iz7SuQH4kpd");
             urls[4] = new URL("https://drive.google.com/uc?export=download&id=1rE29b5DifTchFM5t7xBPNbLyBSDtNPyj");
             urls[5] = new URL("https://drive.google.com/uc?export=download&id=10OATd2xHUERahlXkG_Y-EDTCehcBmwBV");
+            urls[6] = new URL("https://drive.google.com/uc?export=download&id=158ZFfsMAagWPsCWuAQQjcMogTi8S3fEN");
+            urls[7] = new URL("https://drive.google.com/uc?export=download&id=1ztUatavGggIWudfVqtb7CbvxKis3vJs_");
+            urls[8] = new URL("https://drive.google.com/uc?export=download&id=1usPw3GEmkZa1LcFBUUfdka7FnXuITIVf");
+            urls[9] = new URL("https://drive.google.com/uc?export=download&id=1rThhanv4COOW4Mnpa-n5n1W34nuPDoWR");
+            urls[10] = new URL("https://drive.google.com/uc?export=download&id=1J3SEdFzrAx7A8eDZzKvaRDVs5KKCdp8s");
+            urls[11] = new URL("https://drive.google.com/uc?export=download&id=1cRXjZnXFrZeLyqXdLlmy2aRWmztoenTs");
+            urls[12] = new URL("https://drive.google.com/uc?export=download&id=1dAQEkxgwkaMtNyrwE_rEkfJaXYJ8Q63T");
             //
             new DownloadFilesTask().execute(urls);
         } catch (MalformedURLException e) {
